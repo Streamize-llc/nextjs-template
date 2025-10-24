@@ -7,7 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "generate-types": "npx supabase gen types typescript --project-id [project_id] --schema public > src/supabase/schema.type.ts"
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "db:new": "supabase migration new",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:pull": "supabase db pull",
+    "db:diff": "supabase db diff",
+    "db:link": "supabase link --project-ref [project_id]",
+    "db:types": "supabase gen types typescript --project-id [project_id] --schema public > src/utils/supabase/schema.type.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
