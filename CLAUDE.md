@@ -59,9 +59,30 @@ The project uses Supabase SSR (@supabase/ssr) with separate client configuration
 
 TypeScript configured with `@/*` pointing to `src/*` (see tsconfig.json:22-23)
 
+### Configuration Pattern
+
+Config files in `src/config/` manage non-sensitive application settings:
+- `client.ts` - Client-side config (exposed to browser)
+- `server.ts` - Server-only config (extends client config)
+- `index.ts` - Exports clientConfig
+
+**Usage:**
+- Client: `import { clientConfig } from '@/config'`
+- Server: `import { serverConfig } from '@/config/server'`
+
+**Important:** Supabase credentials are managed via environment variables directly (not in config files) for security.
+
 ### UI Components
 
 Uses shadcn/ui pattern with components in `src/components/ui/`. Utility function `cn()` in `src/lib/utils.ts` combines clsx and tailwind-merge for className management.
+
+### Security Headers
+
+Security headers are configured in `next.config.ts`:
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- X-XSS-Protection: 1; mode=block
 
 ### Environment Variables
 
