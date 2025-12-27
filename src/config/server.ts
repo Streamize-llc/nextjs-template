@@ -5,6 +5,7 @@
  * Note: Supabase credentials are managed via environment variables directly
  */
 
+import 'server-only';
 import { clientConfig } from './client';
 
 export const serverConfig = {

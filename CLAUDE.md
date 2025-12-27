@@ -49,28 +49,45 @@ The project uses Supabase SSR (@supabase/ssr) with separate client configuration
 **Middleware** (`src/utils/supabase/middleware.ts` + `src/middleware.ts`):
 - Automatically refreshes auth tokens on every request
 - The `updateSession()` function maintains user sessions
-- Applies to all routes except static files and images (see matcher in src/middleware.ts:9-11)
+- Applies to all routes except static files and images
 
 **Provider** (`src/utils/supabase/provider.tsx`):
-- Wraps the app in src/app/layout.tsx:34
-- Provides Supabase context throughout the application
+- Wraps the app in src/app/layout.tsx
+- Provides Supabase context via `useSupabase()` hook
 
-### Import Aliases
+### Modal System
 
-TypeScript configured with `@/*` pointing to `src/*` (see tsconfig.json:22-23)
+Uses a layered modal architecture based on shadcn/ui Dialog (Radix UI):
+
+**Base Layer** (`src/components/ui/dialog.tsx`):
+- Raw shadcn/ui Dialog primitives
+- Full accessibility support (focus trap, ESC key, aria attributes)
+
+**Application Layer** (`src/components/modals/`):
+- `BaseModal` - Configurable wrapper with size variants (sm/md/lg/xl/full), title, description, footer
+- `ConfirmModal` - Confirmation dialog with confirm/cancel buttons, loading state, destructive variant
+- `AlertModal` - Simple alert with single confirm button
+
+Usage:
+```tsx
+import { BaseModal, ConfirmModal, AlertModal } from '@/components/modals';
+```
 
 ### Configuration Pattern
 
 Config files in `src/config/` manage non-sensitive application settings:
 - `client.ts` - Client-side config (exposed to browser)
-- `server.ts` - Server-only config (extends client config)
-- `index.ts` - Exports clientConfig
+- `server.ts` - Server-only config with `import 'server-only'` guard
 
 **Usage:**
 - Client: `import { clientConfig } from '@/config'`
 - Server: `import { serverConfig } from '@/config/server'`
 
 **Important:** Supabase credentials are managed via environment variables directly (not in config files) for security.
+
+### Import Aliases
+
+TypeScript configured with `@/*` pointing to `src/*`
 
 ### UI Components
 
@@ -90,6 +107,7 @@ Required environment variables (create `.env.local`):
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
 - `NEXT_PUBLIC_GAID` - Google Analytics ID
+- `SUPABASE_DB_PASSWORD` - Database password (for Supabase CLI commands)
 
 ## Key Implementation Details
 
@@ -103,5 +121,4 @@ When implementing auth features, always use the appropriate Supabase client:
 After modifying Supabase schema, run `npm run db:types` to regenerate TypeScript types at `src/utils/supabase/schema.type.ts`
 
 ### Middleware Behavior
-The middleware refreshes user sessions on every request. If implementing protected routes, use the already-configured middleware pattern in src/middleware.ts and extend `updateSession()` as needed.
-- 환경변수에 SUPABASE_DB_PASSWORD 라는 변수를 추가해야 하는 상황은 supabase 관련 명령어에서 DB 제어 명령어에서 해당 환경변수가 설정이 되어있어야해
+The middleware refreshes user sessions on every request. If implementing protected routes, extend `updateSession()` in src/utils/supabase/middleware.ts.

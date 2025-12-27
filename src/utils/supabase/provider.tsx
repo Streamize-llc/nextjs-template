@@ -33,7 +33,7 @@ export default function SupabaseProvider({
 export const useSupabase = () => {
   const context = useContext(Context);
 
-  if (context === undefined) {
+  if (context === null) {
     throw new Error('useSupabase must be used inside SupabaseProvider');
   }
 

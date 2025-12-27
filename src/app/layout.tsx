@@ -26,8 +26,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID!} />
-
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -35,6 +33,7 @@ export default function RootLayout({
           {children}
         </SupabaseProvider>
       </body>
+      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GAID!} />
     </html>
   );
 }
