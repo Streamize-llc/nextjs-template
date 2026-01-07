@@ -16,6 +16,8 @@ export default function SupabaseProvider({
   const supabase = createClient();
 
   useEffect(() => {
+    if (!supabase) return;
+
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((event) => {
@@ -32,9 +34,14 @@ export default function SupabaseProvider({
 
 export const useSupabase = () => {
   const context = useContext(Context);
+  return context;
+};
+
+export const useSupabaseRequired = () => {
+  const context = useContext(Context);
 
   if (context === null) {
-    throw new Error('useSupabase must be used inside SupabaseProvider');
+    throw new Error('Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
   }
 
   return context;

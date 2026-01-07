@@ -53,7 +53,12 @@ The project uses Supabase SSR (@supabase/ssr) with separate client configuration
 
 **Provider** (`src/utils/supabase/provider.tsx`):
 - Wraps the app in src/app/layout.tsx
-- Provides Supabase context via `useSupabase()` hook
+- Auto-refreshes router on `SIGNED_IN` auth events
+- Hooks:
+  - `useSupabase()` - Returns Supabase client or `null` if not configured
+  - `useSupabaseRequired()` - Returns Supabase client or throws if not configured
+
+**Important:** All `createClient()` functions return `null` if environment variables are missing. This allows the app to run without Supabase for local development. Always handle the null case or use `useSupabaseRequired()` when Supabase is required.
 
 ### Modal System
 
