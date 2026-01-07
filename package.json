@@ -15,6 +15,8 @@
     "db:push": "supabase db push",
     "db:pull": "supabase db pull",
     "db:diff": "supabase db diff",
+    "db:lint": "supabase db lint",
+    "db:dump": "supabase db dump -f supabase/dump.sql",
     "db:link": "supabase link --project-ref [project_id]",
     "db:types": "supabase gen types typescript --project-id [project_id] --schema public > src/utils/supabase/schema.type.ts"
   },

@@ -25,6 +25,8 @@ Next.js 15 template with Supabase integration, using the App Router architecture
 - `npm run db:push` - Push migrations to remote
 - `npm run db:pull` - Pull schema from remote
 - `npm run db:diff` - Generate diff for schema changes
+- `npm run db:lint` - Check schema for errors and anti-patterns
+- `npm run db:dump` - Backup database to supabase/dump.sql
 - `npm run db:link` - Link to Supabase project (replace [project_id] first)
 - `npm run db:types` - Generate TypeScript types from Supabase schema (replace [project_id] first)
 
