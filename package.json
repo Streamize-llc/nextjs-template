@@ -18,7 +18,12 @@
     "db:lint": "supabase db lint",
     "db:dump": "supabase db dump -f supabase/dump.sql",
     "db:link": "supabase link --project-ref [project_id]",
-    "db:types": "supabase gen types typescript --project-id [project_id] --schema public > src/utils/supabase/schema.type.ts"
+    "db:types": "supabase gen types typescript --project-id [project_id] --schema public > src/utils/supabase/schema.type.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report e2e/reports"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -39,9 +44,11 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "^15.1.11",
     "postcss": "^8",

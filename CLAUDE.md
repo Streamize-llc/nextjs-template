@@ -129,3 +129,11 @@ After modifying Supabase schema, run `npm run db:types` to regenerate TypeScript
 
 ### Middleware Behavior
 The middleware refreshes user sessions on every request. If implementing protected routes, extend `updateSession()` in src/utils/supabase/middleware.ts.
+
+## E2E Testing
+
+E2E 테스트 가이드는 [E2E.md](./E2E.md)를 참고하세요.
+
+주요 명령어:
+- `npm run test:e2e` - E2E 테스트 실행
+- `npm run test:e2e:ui` - UI 모드로 실행
