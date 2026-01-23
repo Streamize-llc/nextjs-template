@@ -24,6 +24,7 @@ export default defineConfig({
   reporter: [
     ['html', { outputFolder: 'e2e/reports' }],
     ['list'],
+    ['./e2e/reporters/summary-reporter.ts'],
   ],
 
   /* Shared settings for all the projects below */
