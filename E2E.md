@@ -186,7 +186,7 @@ npm run test:e2e
 ### .env.test
 
 ```env
-E2E_BASE_URL=http://localhost:3000
+E2E_BASE_URL=http://localhost:2000
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
