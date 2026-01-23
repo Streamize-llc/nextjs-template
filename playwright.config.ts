@@ -29,7 +29,7 @@ export default defineConfig({
 
   /* Shared settings for all the projects below */
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:2000',
+    baseURL: 'http://localhost:2000',
 
     /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',
