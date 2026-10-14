@@ -25,7 +25,7 @@ export default async function BillingPage() {
   const { data: transactions } = await supabase
     .from("billing_transactions")
     .select("id, billed_at, total, refunded, currency, status, invoice_number")
-    .order("billed_at", { ascending: false })
+    .order("billed_at", { ascending: false, nullsFirst: false })
     .limit(10);
 
   return (

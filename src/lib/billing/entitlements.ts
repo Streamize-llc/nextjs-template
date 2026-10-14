@@ -123,7 +123,7 @@ export async function readSubscriptions(supabase: SupabaseClient, userId: string
 
 /** The provider of the user's most recent payment. */
 export async function readLastPaymentProvider(supabase: SupabaseClient, userId: string): Promise<Provider | null> {
-  const { data, error } = await supabase.from("billing_transactions").select("provider").eq("user_id", userId).order("billed_at", { ascending: false }).limit(1);
+  const { data, error } = await supabase.from("billing_transactions").select("provider").eq("user_id", userId).order("billed_at", { ascending: false, nullsFirst: false }).limit(1);
   if (error) throw new Error(`read transactions: ${error.message}`);
   const provider = data?.[0]?.provider;
   return provider === "paddle" || provider === "polar" ? provider : null;

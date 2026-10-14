@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Supabase client with the SERVICE ROLE key: it bypasses Row Level Security. Server only (the `server-only` import fails the build if a
- * client component ever imports this). Use it for what no signed-in user may do themselves: the Paddle webhook, and the billing routes
+ * client component ever imports this). Use it for what no signed-in user may do themselves: the Paddle and Polar webhooks, and the billing routes
  * that write `billing_*` rows. Returns null when the environment is not configured, like the other Supabase helpers.
  */
 export function createAdminClient(): SupabaseClient | null {
