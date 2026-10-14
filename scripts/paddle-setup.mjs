@@ -65,7 +65,7 @@ function check() {
   }
   for (const { name, ok, hint } of rows) console.log(`${ok ? "✔" : "✖"} ${name}${ok ? "" : `  <- ${hint}`}`);
   const missing = rows.filter((r) => !r.ok).length;
-  console.log(missing === 0 ? "\nReady." : `\n${missing} thing(s) to do. See PADDLE.md.`);
+  console.log(missing === 0 ? "\nReady." : `\n${missing} thing(s) to do. See BILLING.md.`);
   process.exit(missing === 0 ? 0 : 1);
 }
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { billingErrorMessage } from "./messages";
 
-/** Opens Paddle's customer portal (card, invoices, plan, cancellation) with a fresh signed-in link. */
+/** Opens the customer portal (card, invoices, plan, cancellation) of the provider that bills this user, with a fresh signed-in link. */
 export function ManageButton({ children = "Manage billing", ...buttonProps }: Omit<ButtonProps, "onClick" | "disabled">) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

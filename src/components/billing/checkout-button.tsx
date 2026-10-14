@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import type { BillingInterval } from "@/config/billing";
+import { nextCheckoutStep, type CheckoutAnswer } from "./checkout-flow";
 import { billingErrorMessage } from "./messages";
 import { getPaddle } from "./paddle-js";
 
 type Target = { kind: "plan"; itemKey: string; interval: BillingInterval } | { kind: "product"; itemKey: string };
 
 /**
- * Buys one thing: asks the server for a transaction (POST /api/billing/checkout), then opens Paddle's checkout on it. A visitor who is
- * not signed in is sent to `loginPath` and brought back here afterwards.
+ * Buys one thing: asks the server to create the checkout (POST /api/billing/checkout), then continues the way the provider that takes new
+ * checkouts wants: Paddle's overlay opens on the transaction, Polar's checkout page replaces this one. The button does not need to know
+ * which one is configured. A visitor who is not signed in is sent to `loginPath` and brought back here afterwards.
  */
 export function CheckoutButton({
   target,
@@ -31,20 +33,20 @@ export function CheckoutButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(target.kind === "plan" ? { kind: "plan", key: target.itemKey, interval: target.interval } : { kind: "product", key: target.itemKey }),
       });
-      const json = (await response.json().catch(() => ({}))) as { error?: string; transactionId?: string; clientToken?: string; environment?: "sandbox" | "production" };
-      if (response.status === 401) {
+      const step = nextCheckoutStep(response.status, response.ok, (await response.json().catch(() => ({}))) as CheckoutAnswer);
+      if (step.action === "sign_in") {
         window.location.href = `${loginPath}?next=${encodeURIComponent(window.location.pathname)}`;
-        return;
+      } else if (step.action === "redirect") {
+        window.location.href = step.url;
+      } else if (step.action === "paddle_overlay") {
+        const paddle = await getPaddle(step.clientToken, step.environment);
+        paddle.Checkout.open({
+          transactionId: step.transactionId,
+          settings: { displayMode: "overlay", successUrl: `${window.location.origin}${successPath}` },
+        });
+      } else {
+        setError(billingErrorMessage(step.code));
       }
-      if (!response.ok || !json.transactionId || !json.clientToken || !json.environment) {
-        setError(billingErrorMessage(json.error));
-        return;
-      }
-      const paddle = await getPaddle(json.clientToken, json.environment);
-      paddle.Checkout.open({
-        transactionId: json.transactionId,
-        settings: { displayMode: "overlay", successUrl: `${window.location.origin}${successPath}` },
-      });
     } catch (caught) {
       setError(billingErrorMessage(caught instanceof Error ? caught.message : null));
     } finally {

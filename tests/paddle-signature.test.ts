@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { describe, it } from "node:test";
-import { SIGNATURE_TOLERANCE_SECONDS, signPaddleBody, verifyPaddleSignature } from "@/lib/paddle/signature";
+import { SIGNATURE_TOLERANCE_SECONDS, signPaddleBody, verifyPaddleSignature } from "@/lib/billing/paddle/signature";
 
 const SECRET = "pdl_ntfset_secret";
 const BODY = JSON.stringify({ event_id: "evt_1", event_type: "subscription.created", occurred_at: "2026-10-14T00:00:00Z", data: {} });

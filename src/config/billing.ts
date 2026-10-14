@@ -1,11 +1,17 @@
 /**
  * What this app sells. EDIT THIS FILE FIRST after cloning the template: it is the one place the pricing page, the checkout,
- * the webhook and `npm run paddle:catalog` (which creates the products and prices in Paddle from it) all read.
+ * the webhooks and the catalog scripts (`npm run paddle:catalog`, `npm run polar:catalog`: they create the products and prices from it)
+ * all read. It is the same whichever payment provider you use, and you can change provider later without touching it.
  *
- * Nothing secret lives here (it ships to the browser). Price IDs live in the environment, never here: after
- * `npm run paddle:catalog` the script prints one `PADDLE_PRICE_<KEY>_<INTERVAL>` line per price to put into `.env.local`.
- * See PADDLE.md.
+ * Nothing secret lives here (it ships to the browser). The provider's ids live in the environment, never here: after the catalog
+ * script has run, `.env.local` holds one `PADDLE_PRICE_<KEY>_<INTERVAL>` line (Paddle) and/or one `POLAR_PRODUCT_<KEY>_<INTERVAL>` line
+ * (Polar) per item. See BILLING.md.
  */
+
+/** The two payment providers (merchants of record) the template can sell through. `BILLING_PROVIDER` picks the one for NEW checkouts. */
+export type BillingProviderName = "paddle" | "polar";
+
+export const BILLING_PROVIDERS = ["paddle", "polar"] as const satisfies readonly BillingProviderName[];
 
 export type BillingInterval = "month" | "year";
 
@@ -39,7 +45,7 @@ export const billingConfig = {
 
   /**
    * Subscription plans (recurring). Replace these two examples. A user with an active plan is found with `getEntitlement()`
-   * (src/lib/paddle/entitlements.ts); what a plan allows is YOUR code, keyed on `plan.key`.
+   * (src/lib/billing/entitlements.ts); what a plan allows is YOUR code, keyed on `plan.key`.
    */
   plans: [
     {
@@ -95,6 +101,16 @@ export function catalogItems(config: { plans: readonly BillingPlan[]; products: 
 /** `PADDLE_PRICE_PRO_MONTH`, `PADDLE_PRICE_CREDITS_100` ... the env var that holds the Paddle price id of an item. */
 export function priceEnvName(item: { key: string; interval: BillingInterval | null }): string {
   return `PADDLE_PRICE_${item.key.toUpperCase()}${item.interval ? `_${item.interval.toUpperCase()}` : ""}`;
+}
+
+/** `POLAR_PRODUCT_PRO_MONTH`, `POLAR_PRODUCT_CREDITS_100` ... the env var that holds the Polar product id of an item (a Polar product has ONE interval). */
+export function productEnvName(item: { key: string; interval: BillingInterval | null }): string {
+  return `POLAR_PRODUCT_${item.key.toUpperCase()}${item.interval ? `_${item.interval.toUpperCase()}` : ""}`;
+}
+
+/** The env var that holds a provider's id for an item (Paddle: a price id, Polar: a product id). */
+export function providerEnvName(provider: BillingProviderName, item: { key: string; interval: BillingInterval | null }): string {
+  return provider === "paddle" ? priceEnvName(item) : productEnvName(item);
 }
 
 const KEY = /^[a-z][a-z0-9_]{0,30}$/;

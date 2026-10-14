@@ -20,18 +20,25 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Billing (Paddle)
+## Billing (Paddle or Polar)
 
-Subscriptions and one-time purchases are built in: `/pricing`, `/billing`, a signed webhook, Supabase tables with Row Level Security, and a `getEntitlement()` helper for the rest of your app. It stays off until you configure it.
+Subscriptions and one-time purchases are built in, through **Paddle or Polar** (merchants of record): `/pricing`, `/billing`, signed webhooks, tables with Row Level Security, and a `getEntitlement(supabase, userId)` helper for the rest of your app. You pick the provider per project with `BILLING_PROVIDER=paddle|polar`, and you can switch later without touching anybody who has already paid. It stays off until you configure it.
 
 ```bash
 # 1. edit your plans in src/config/billing.ts, apply the migration (npm run db:reset), fill .env.local from .env.example
+# Paddle:
 npm run paddle:catalog -- --write      # creates the products and prices in Paddle (sandbox) from that file
 npm run paddle:webhook -- https://<your-tunnel>/api/webhooks/paddle --write
 npm run paddle:check                   # what is configured, what is missing
+# Polar:
+npm run polar:catalog                  # lists the products to create in the Polar dashboard; paste their ids into .env.local
+npm run polar:webhook -- https://<your-tunnel>/api/webhooks/polar --write
+npm run polar:check                    # what is configured, what is missing, and whether each product matches the file
+# Both:
+npm run billing:check                  # which provider takes new checkouts, and is each one ready
 ```
 
-The full guide, the go-live checklist (domain approval, live keys) and troubleshooting are in [PADDLE.md](./PADDLE.md).
+The full guide (choosing, switching, the go-live checklists, troubleshooting) is in [BILLING.md](./BILLING.md).
 
 ## Learn More
 

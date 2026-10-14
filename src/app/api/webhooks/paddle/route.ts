@@ -1,7 +1,9 @@
-import { paddleConfigOrResponse, errorResponse, webhookContext } from "@/lib/paddle/route-helpers";
-import { verifyPaddleSignature } from "@/lib/paddle/signature";
-import { supabaseBillingStore } from "@/lib/paddle/store";
-import { parsePaddleEvent, processPaddleDelivery } from "@/lib/paddle/webhook";
+import { paddleWebhookContext } from "@/lib/billing/paddle/adapter";
+import { paddleConfigOrResponse } from "@/lib/billing/paddle/route-helpers";
+import { verifyPaddleSignature } from "@/lib/billing/paddle/signature";
+import { parsePaddleEvent, processPaddleDelivery } from "@/lib/billing/paddle/webhook";
+import { errorResponse } from "@/lib/billing/route-helpers";
+import { supabaseBillingStore } from "@/lib/billing/store";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export const runtime = "nodejs";
@@ -9,9 +11,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * Paddle webhook. Point a notification destination at `https://<your domain>/api/webhooks/paddle` (`npm run paddle:webhook`).
+ * It is processed whichever provider `BILLING_PROVIDER` names: subscribers who bought through Paddle keep being updated after a switch.
  *
  * Order matters: the signature is checked on the RAW body before anything is parsed, the event is claimed (idempotency) before it is
- * applied, and any failure answers 500 so that Paddle delivers it again. The rules for what is believed are in src/lib/paddle/webhook.ts.
+ * applied, and any failure answers 500 so that Paddle delivers it again. The rules for what is believed are in src/lib/billing/delivery.ts
+ * and src/lib/billing/paddle/webhook.ts.
  */
 export async function POST(request: Request) {
   const configured = paddleConfigOrResponse();
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processPaddleDelivery(supabaseBillingStore(admin), event, webhookContext(config));
+    const result = await processPaddleDelivery(supabaseBillingStore(admin), event, paddleWebhookContext(config.appTag));
     return Response.json({ ok: true, status: result.status });
   } catch (error) {
     console.error(`[paddle] webhook ${event.event_type} ${event.event_id} failed:`, error);

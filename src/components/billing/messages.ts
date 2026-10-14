@@ -10,7 +10,7 @@ const MESSAGES: Record<string, string> = {
   customer_conflict: "This e-mail is already linked to another account. Please contact support.",
   price_not_configured: "This plan is not available yet.",
   unknown_item: "This plan does not exist.",
-  paddle_not_configured: "Payments are not set up yet.",
+  billing_not_configured: "Payments are not set up yet.",
   too_many_requests: "Please wait a moment and try again.",
   no_customer: "There is nothing to manage yet: you have not bought anything.",
   paddle_js_failed: "The payment window could not be loaded. Check your connection or any blocker, then try again.",

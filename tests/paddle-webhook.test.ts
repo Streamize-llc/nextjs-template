@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { applyPaddleEvent, minor, parsePaddleEvent, processPaddleDelivery } from "@/lib/paddle/webhook";
-import { adjustmentData, context, CUSTOMER_ID, event, MemoryStore, subscriptionData, transactionData, USER_ID } from "./support/paddle-fixtures";
+import { applyPaddleEvent, minor, parsePaddleEvent, processPaddleDelivery } from "@/lib/billing/paddle/webhook";
+import { adjustmentData, context, CUSTOMER_ID, event, MemoryStore, subscriptionData, transactionData, USER_ID } from "./support/billing-fixtures";
 
 const ctx = context();
 
@@ -10,10 +10,11 @@ describe("subscription events", () => {
     const store = new MemoryStore();
     const result = await applyPaddleEvent(store, event("subscription.created", subscriptionData({ status: "trialing" })), ctx);
     assert.equal(result.status, "processed");
-    assert.deepEqual(store.subscriptions.get("sub_01test"), {
+    assert.deepEqual(store.subscriptions.get("paddle_sub_01test"), {
       id: "sub_01test",
       user_id: USER_ID,
-      paddle_customer_id: CUSTOMER_ID,
+      provider: "paddle",
+      customer_id: CUSTOMER_ID,
       status: "trialing",
       plan_key: "pro",
       price_id: "pri_pro_month",
@@ -34,9 +35,9 @@ describe("subscription events", () => {
     const store = new MemoryStore();
     const scheduled = { action: "cancel", effective_at: "2026-11-14T00:00:00Z", resume_at: null };
     await applyPaddleEvent(store, event("subscription.updated", subscriptionData({ scheduled_change: scheduled }), "2026-10-20T00:00:00Z"), ctx);
-    assert.equal(store.subscriptions.get("sub_01test")?.cancel_at_period_end, true);
+    assert.equal(store.subscriptions.get("paddle_sub_01test")?.cancel_at_period_end, true);
     await applyPaddleEvent(store, event("subscription.canceled", subscriptionData({ status: "canceled", canceled_at: "2026-11-14T00:00:00Z" }), "2026-11-14T00:00:01Z"), ctx);
-    const row = store.subscriptions.get("sub_01test");
+    const row = store.subscriptions.get("paddle_sub_01test");
     assert.equal(row?.status, "canceled");
     assert.equal(row?.cancel_at_period_end, false);
     assert.equal(row?.canceled_at, "2026-11-14T00:00:00Z");
@@ -46,14 +47,14 @@ describe("subscription events", () => {
     const store = new MemoryStore();
     await applyPaddleEvent(store, event("subscription.canceled", subscriptionData({ status: "canceled" }), "2026-11-14T00:00:00Z"), ctx);
     await applyPaddleEvent(store, event("subscription.updated", subscriptionData({ status: "active" }), "2026-10-20T00:00:00Z"), ctx);
-    assert.equal(store.subscriptions.get("sub_01test")?.status, "canceled");
+    assert.equal(store.subscriptions.get("paddle_sub_01test")?.status, "canceled");
   });
 
   it("understands a yearly price and the plan it belongs to", async () => {
     const store = new MemoryStore();
     const yearly = { quantity: 1, recurring: true, price: { id: "pri_team_year", unit_price: { amount: "29000", currency_code: "USD" }, billing_cycle: { interval: "year", frequency: 1 } } };
     await applyPaddleEvent(store, event("subscription.activated", subscriptionData({ items: [yearly], billing_cycle: { interval: "year", frequency: 1 } })), ctx);
-    const row = store.subscriptions.get("sub_01test");
+    const row = store.subscriptions.get("paddle_sub_01test");
     assert.equal(row?.plan_key, "team");
     assert.equal(row?.billing_interval, "year");
     assert.equal(row?.unit_amount, 29000);
@@ -95,10 +96,11 @@ describe("transaction.completed", () => {
     const store = new MemoryStore();
     const result = await applyPaddleEvent(store, event("transaction.completed", transactionData()), ctx);
     assert.equal(result.status, "processed");
-    assert.deepEqual(store.transactions.get("txn_01test"), {
+    assert.deepEqual(store.transactions.get("paddle_txn_01test"), {
       id: "txn_01test",
       user_id: USER_ID,
-      paddle_customer_id: CUSTOMER_ID,
+      provider: "paddle",
+      customer_id: CUSTOMER_ID,
       subscription_id: "sub_01test",
       status: "completed",
       origin: "api",
@@ -118,8 +120,8 @@ describe("transaction.completed", () => {
     const store = new MemoryStore();
     const items = [{ quantity: 1, price_id: "pri_credits_100", price: { id: "pri_credits_100" } }];
     await applyPaddleEvent(store, event("transaction.completed", transactionData({ id: "txn_pack", subscription_id: null, items })), ctx);
-    assert.equal(store.transactions.get("txn_pack")?.item_key, "credits_100");
-    assert.equal(store.transactions.get("txn_pack")?.subscription_id, null);
+    assert.equal(store.transactions.get("paddle_txn_pack")?.item_key, "credits_100");
+    assert.equal(store.transactions.get("paddle_txn_pack")?.subscription_id, null);
   });
 
   it("ignores a payment of an unknown customer, of another app, or for a price that is not ours", async () => {
@@ -136,7 +138,7 @@ describe("transaction.completed", () => {
     await applyPaddleEvent(store, event("transaction.completed", transactionData()), ctx);
     await applyPaddleEvent(store, event("adjustment.updated", adjustmentData()), ctx);
     await applyPaddleEvent(store, event("transaction.completed", transactionData()), ctx);
-    assert.equal(store.transactions.get("txn_01test")?.refunded, 990);
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 990);
   });
 });
 
@@ -145,15 +147,24 @@ describe("adjustments (refunds)", () => {
     const store = new MemoryStore();
     await applyPaddleEvent(store, event("transaction.completed", transactionData()), ctx);
     await applyPaddleEvent(store, event("adjustment.created", adjustmentData({ id: "adj_pending", status: "pending_approval", totals: { total: "300" } })), ctx);
-    assert.equal(store.transactions.get("txn_01test")?.refunded, 0, "a refund that is not approved yet is not a refund");
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 0, "a refund that is not approved yet is not a refund");
     await applyPaddleEvent(store, event("adjustment.updated", adjustmentData({ id: "adj_pending", status: "approved", totals: { total: "300" } })), ctx);
-    assert.equal(store.transactions.get("txn_01test")?.refunded, 300);
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 300);
     await applyPaddleEvent(store, event("adjustment.created", adjustmentData({ id: "adj_cb", action: "chargeback", totals: { total: "200" } })), ctx);
     await applyPaddleEvent(store, event("adjustment.created", adjustmentData({ id: "adj_credit", action: "credit", totals: { total: "50" } })), ctx);
     await applyPaddleEvent(store, event("adjustment.created", adjustmentData({ id: "adj_rej", status: "rejected", totals: { total: "40" } })), ctx);
-    assert.equal(store.transactions.get("txn_01test")?.refunded, 500);
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 500);
     await applyPaddleEvent(store, event("adjustment.updated", adjustmentData({ id: "adj_cb", action: "chargeback", status: "reversed", totals: { total: "200" } })), ctx);
-    assert.equal(store.transactions.get("txn_01test")?.refunded, 300, "a reversed chargeback is taken back");
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 300, "a reversed chargeback is taken back");
+  });
+
+  it("never lets a late, older delivery undo a refund that was already approved", async () => {
+    const store = new MemoryStore();
+    await applyPaddleEvent(store, event("transaction.completed", transactionData()), ctx);
+    await applyPaddleEvent(store, event("adjustment.updated", adjustmentData({ status: "approved" }), "2026-10-14T00:10:00Z"), ctx);
+    await applyPaddleEvent(store, event("adjustment.created", adjustmentData({ status: "pending_approval" }), "2026-10-14T00:05:00Z"), ctx);
+    assert.equal(store.adjustments.get("paddle_adj_01test")?.status, "approved");
+    assert.equal(store.transactions.get("paddle_txn_01test")?.refunded, 990);
   });
 
   it("ignores an adjustment of a payment we never recorded (it belongs to another app)", async () => {
@@ -172,13 +183,13 @@ describe("a delivery", () => {
     store.subscriptions.clear();
     assert.equal((await processPaddleDelivery(store, delivery, ctx)).status, "duplicate");
     assert.equal(store.subscriptions.size, 0, "the duplicate was not applied again");
-    assert.equal(store.events.get("evt_same")?.status, "processed");
+    assert.equal(store.events.get("paddle_evt_same")?.status, "processed");
   });
 
   it("records an ignored event as ignored, with the reason", async () => {
     const store = new MemoryStore();
     await processPaddleDelivery(store, event("subscription.created", subscriptionData({ customer_id: "ctm_01stranger" }), "2026-10-14T00:00:10Z", "evt_stranger"), ctx);
-    assert.deepEqual(store.events.get("evt_stranger"), { status: "ignored", note: "unknown_customer" });
+    assert.deepEqual(store.events.get("paddle_evt_stranger"), { status: "ignored", note: "unknown_customer" });
   });
 
   it("answers an event type it does not handle with ignored, not an error (Paddle would retry an error)", async () => {
@@ -192,7 +203,7 @@ describe("a delivery", () => {
     const delivery = event("subscription.created", subscriptionData(), "2026-10-14T00:00:10Z", "evt_retry");
     store.failNextWrite = true;
     await assert.rejects(processPaddleDelivery(store, delivery, ctx), /database is down/);
-    assert.equal(store.events.get("evt_retry")?.status, "failed");
+    assert.equal(store.events.get("paddle_evt_retry")?.status, "failed");
     assert.equal(store.subscriptions.size, 0);
     assert.equal((await processPaddleDelivery(store, delivery, ctx)).status, "processed");
     assert.equal(store.subscriptions.size, 1);

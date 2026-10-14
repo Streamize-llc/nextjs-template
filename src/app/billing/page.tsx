@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ManageButton } from "@/components/billing/manage-button";
-import { formatDate, formatMinor } from "@/components/billing/format";
+import { formatDate, formatMinor, subscriptionNote } from "@/components/billing/format";
 import { billingConfig } from "@/config/billing";
-import { getEntitlement } from "@/lib/paddle/entitlements";
+import { getEntitlement } from "@/lib/billing/entitlements";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
@@ -14,15 +14,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const STATUS_TEXT: Record<string, string> = {
-  active: "Active",
-  trialing: "In trial",
-  past_due: "Payment failed: Paddle is retrying",
-  paused: "Paused",
-  canceled: "Canceled",
-};
-
-/** The signed-in user's subscription and payments, and the button into Paddle's portal. All reads go through Row Level Security. */
+/** The signed-in user's subscription and payments, and the button into the portal of the provider that bills them. All reads go through Row Level Security. */
 export default async function BillingPage() {
   const supabase = await createClient();
   const user = supabase ? (await supabase.auth.getUser()).data.user : null;
@@ -51,12 +43,7 @@ export default async function BillingPage() {
               {entitlement.interval ? ` · billed every ${entitlement.interval}` : null}
             </p>
             <p className="text-sm text-muted-foreground">
-              {STATUS_TEXT[entitlement.status] ?? entitlement.status}
-              {entitlement.currentPeriodEnd
-                ? entitlement.cancelAtPeriodEnd
-                  ? `. Ends on ${formatDate(entitlement.currentPeriodEnd)}.`
-                  : `. Renews on ${formatDate(entitlement.currentPeriodEnd)}.`
-                : null}
+              {subscriptionNote(entitlement.status, entitlement.cancelAtPeriodEnd, entitlement.currentPeriodEnd)}
             </p>
             <ManageButton />
           </>

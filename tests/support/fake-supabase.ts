@@ -1,13 +1,23 @@
-// A small in-memory stand-in for the part of supabase-js the billing code uses: from(table).insert / upsert / update / select with eq, lt, lte,
-// limit, and a thenable result of the shape { data, error }. It follows PostgREST where it matters here: a duplicate primary or unique key is
-// error 23505, `upsert` only touches the columns it is given, `ignoreDuplicates` leaves an existing row alone, and `update ... select` returns
-// the rows it changed. It does NOT check Row Level Security or types; the SQL has its own review.
+// A small in-memory stand-in for the part of supabase-js the billing code uses: from(table).insert / upsert / update / select with eq, is, in, lt, lte,
+// order, limit, and a thenable result of the shape { data, error }. It follows PostgREST where it matters here: a duplicate primary or unique key is
+// error 23505 (on insert, on upsert AND on update), a unique column may be null in many rows, `upsert` only touches the columns it is given,
+// `ignoreDuplicates` leaves an existing row alone, a composite `onConflict: "provider,id"` matches on every column, timestamps compare as instants,
+// and `update ... select` returns the rows it changed. It does NOT check Row Level Security or types: the SQL has its own check (see BILLING.md).
 type Row = Record<string, unknown>;
 type Result = { data: Row[] | null; error: { code?: string; message: string } | null };
 
 interface TableSpec {
-  primaryKey: string;
+  primaryKey: string | string[];
   unique?: string[];
+}
+
+const columnsOf = (key: string | string[]): string[] => (Array.isArray(key) ? key : key.split(",").map((column) => column.trim()));
+
+/** Compares two column values the way Postgres would for the types used here: instants for timestamps, strings otherwise. */
+function compare(a: unknown, b: unknown): number {
+  const isTime = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ]/.test(value);
+  if (isTime(a) && isTime(b)) return Date.parse(String(a)) - Date.parse(String(b));
+  return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
 }
 
 export class FakeSupabase {
@@ -15,6 +25,8 @@ export class FakeSupabase {
   specs: Record<string, TableSpec>;
   /** Every statement that ran, for tests that care about how many round trips happened. */
   log: string[] = [];
+  /** When set, a row with a `user_id` that is not in here is refused like the foreign key to auth.users does (23503). */
+  users: Set<string> | null = null;
 
   constructor(specs: Record<string, TableSpec>) {
     this.specs = specs;
@@ -27,6 +39,9 @@ export class FakeSupabase {
   }
 }
 
+const DUPLICATE = (table: string) => ({ code: "23505", message: `duplicate key value violates unique constraint on ${table}` });
+const NO_USER = (table: string) => ({ code: "23503", message: `insert or update on table "${table}" violates foreign key constraint to auth.users` });
+
 class Query {
   private op: "select" | "insert" | "upsert" | "update" = "select";
   private payload: Row = {};
@@ -35,6 +50,7 @@ class Query {
   private returning = false;
   private columns: string[] | null = null;
   private max = Infinity;
+  private sort: { column: string; ascending: boolean } | null = null;
 
   private db: FakeSupabase;
   private table: string;
@@ -70,19 +86,24 @@ class Query {
     this.filters.push((row) => row[column] === value);
     return this;
   }
+  is(column: string, value: null | boolean) {
+    this.filters.push((row) => (value === null ? row[column] === null || row[column] === undefined : row[column] === value));
+    return this;
+  }
   in(column: string, values: unknown[]) {
     this.filters.push((row) => values.includes(row[column]));
     return this;
   }
-  order(_column: string, _options?: unknown) {
+  order(column: string, options?: { ascending?: boolean }) {
+    this.sort = { column, ascending: options?.ascending ?? true };
     return this;
   }
   lt(column: string, value: unknown) {
-    this.filters.push((row) => String(row[column]) < String(value));
+    this.filters.push((row) => compare(row[column], value) < 0);
     return this;
   }
   lte(column: string, value: unknown) {
-    this.filters.push((row) => String(row[column]) <= String(value));
+    this.filters.push((row) => compare(row[column], value) <= 0);
     return this;
   }
   limit(n: number) {
@@ -101,34 +122,59 @@ class Query {
   private run(): Result {
     const rows = this.db.tables[this.table];
     const spec = this.db.specs[this.table];
+    const primary = columnsOf(spec.primaryKey);
     this.db.log.push(`${this.op} ${this.table}`);
     const matching = () => rows.filter((row) => this.filters.every((f) => f(row)));
-    const clash = (candidate: Row) =>
-      rows.find((row) => row[spec.primaryKey] === candidate[spec.primaryKey] || (spec.unique ?? []).some((column) => candidate[column] !== undefined && row[column] === candidate[column]));
+    const samePrimary = (a: Row, b: Row, columns = primary) => columns.every((column) => a[column] === b[column]);
+    /** The existing row that `candidate` would collide with, other than `except` (primary key, or a unique column that is not null). */
+    const clash = (candidate: Row, except?: Row) =>
+      rows.find(
+        (row) =>
+          row !== except &&
+          ((primary.every((column) => candidate[column] !== undefined) && samePrimary(row, candidate)) || (spec.unique ?? []).some((column) => candidate[column] != null && row[column] === candidate[column])),
+      );
 
     const project = (row: Row): Row => (this.columns ? Object.fromEntries(this.columns.map((column) => [column, row[column]])) : { ...row });
 
-    if (this.op === "select") return { data: matching().slice(0, this.max).map(project), error: null };
+    if (this.op === "select") {
+      const found = matching();
+      if (this.sort) {
+        const { column, ascending } = this.sort;
+        found.sort((a, b) => (ascending ? 1 : -1) * compare(a[column], b[column]));
+      }
+      return { data: found.slice(0, this.max).map(project), error: null };
+    }
+
+    if ((this.op === "insert" || this.op === "upsert") && this.db.users && typeof this.payload.user_id === "string" && !this.db.users.has(this.payload.user_id)) {
+      return { data: null, error: NO_USER(this.table) };
+    }
 
     if (this.op === "insert") {
-      if (clash(this.payload)) return { data: null, error: { code: "23505", message: `duplicate key value violates unique constraint on ${this.table}` } };
+      if (clash(this.payload)) return { data: null, error: DUPLICATE(this.table) };
       rows.push({ ...this.payload });
       return { data: [], error: null };
     }
 
     if (this.op === "upsert") {
-      const existing = rows.find((row) => row[this.options.onConflict ?? spec.primaryKey] === this.payload[this.options.onConflict ?? spec.primaryKey]);
+      const conflictColumns = this.options.onConflict ? columnsOf(this.options.onConflict) : primary;
+      const existing = rows.find((row) => samePrimary(row, this.payload, conflictColumns));
       if (existing) {
-        if (!this.options.ignoreDuplicates) Object.assign(existing, this.payload);
+        if (!this.options.ignoreDuplicates) {
+          const other = clash({ ...existing, ...this.payload }, existing);
+          if (other) return { data: null, error: DUPLICATE(this.table) };
+          Object.assign(existing, this.payload);
+        }
       } else {
-        const other = clash(this.payload);
-        if (other) return { data: null, error: { code: "23505", message: `duplicate key value violates unique constraint on ${this.table}` } };
+        if (clash(this.payload)) return { data: null, error: DUPLICATE(this.table) };
         rows.push({ ...this.payload });
       }
       return { data: [], error: null };
     }
 
     const changed = matching();
+    for (const row of changed) {
+      if (clash({ ...row, ...this.payload }, row)) return { data: null, error: DUPLICATE(this.table) };
+    }
     for (const row of changed) Object.assign(row, this.payload);
     return { data: this.returning ? changed.map(project) : [], error: null };
   }
@@ -137,9 +183,9 @@ class Query {
 export function billingDb() {
   return new FakeSupabase({
     billing_customers: { primaryKey: "user_id", unique: ["paddle_customer_id"] },
-    billing_subscriptions: { primaryKey: "id" },
-    billing_transactions: { primaryKey: "id" },
-    billing_adjustments: { primaryKey: "id" },
-    billing_webhook_events: { primaryKey: "event_id" },
+    billing_subscriptions: { primaryKey: ["provider", "id"] },
+    billing_transactions: { primaryKey: ["provider", "id"] },
+    billing_adjustments: { primaryKey: ["provider", "id"] },
+    billing_webhook_events: { primaryKey: ["provider", "event_id"] },
   });
 }
