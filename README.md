@@ -20,6 +20,19 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Billing (Paddle)
+
+Subscriptions and one-time purchases are built in: `/pricing`, `/billing`, a signed webhook, Supabase tables with Row Level Security, and an `getEntitlement()` helper for the rest of your app. It stays off until you configure it.
+
+```bash
+# 1. edit your plans in src/config/billing.ts, apply the migration (npm run db:reset), fill .env.local from .env.example
+npm run paddle:catalog -- --write      # creates the products and prices in Paddle (sandbox) from that file
+npm run paddle:webhook -- https://<your-tunnel>/api/webhooks/paddle --write
+npm run paddle:check                   # what is configured, what is missing
+```
+
+The full guide, the go-live checklist (domain approval, live keys) and troubleshooting are in [PADDLE.md](./PADDLE.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

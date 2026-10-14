@@ -115,6 +115,21 @@ Required environment variables (create `.env.local`):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
 - `NEXT_PUBLIC_GAID` - Google Analytics ID
 - `SUPABASE_DB_PASSWORD` - Database password (for Supabase CLI commands)
+- `SUPABASE_SERVICE_ROLE_KEY` - Server only, bypasses RLS (Paddle webhook and billing routes)
+- Paddle (`PADDLE_APP_TAG`, `NEXT_PUBLIC_PADDLE_ENVIRONMENT`, `PADDLE_API_KEY`, `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_*`) - see `PADDLE.md` and `.env.example`
+
+## Paddle Billing
+
+Subscriptions and one-time purchases with Paddle (merchant of record). Full guide: [PADDLE.md](./PADDLE.md). Run `npm run paddle:check` to see what is configured.
+
+- **`src/config/billing.ts` is the single source** for plans, products and prices (pricing page, checkout, webhook and `npm run paddle:catalog` all read it). Price ids are NOT in code: they are `PADDLE_PRICE_<KEY>_<INTERVAL>` env vars.
+- **Server code** in `src/lib/paddle/`: `config.ts` (env, price lookup), `api.ts` (REST via `fetch`), `signature.ts`, `webhook.ts` (pure event logic over a `BillingStore`), `store.ts` (Supabase `BillingStore`, service role), `customers.ts`, `checkout.ts`, `sync.ts`, `entitlements.ts` (`getEntitlement`, `hasPurchased`: what the rest of the app calls).
+- **Routes**: `POST /api/webhooks/paddle`, `/api/billing/checkout`, `/api/billing/portal`, `/api/billing/sync`. Pages: `/pricing`, `/billing`, `/billing/success`. UI in `src/components/billing/`.
+- **Tables** (migration `…_paddle_billing.sql`): `billing_customers`, `billing_subscriptions`, `billing_transactions`, `billing_adjustments`, `billing_webhook_events`. RLS: a user reads only their own rows; **all writes are service role, server side**. Never add a write policy for `authenticated`.
+- **Rules that must not be weakened**: a payment is credited through the Paddle customer linked by the server (never custom data or anything from the browser); only prices in `.env` count; the server creates the transaction (the browser only names plan + interval); the webhook verifies the signature on the raw body and refuses when no secret is set; events are idempotent and an older subscription event never overwrites a newer one.
+- **Client modules**: a function exported from a `"use client"` file cannot be called from a server component (it fails at request time, not at build). Helpers used on both sides live in `src/components/billing/format.ts`; `tests/paddle-ui.test.ts` enforces it.
+- Errors from the billing routes are stable codes (`already_subscribed`, `price_not_configured`, ...), never display text; texts are in `src/components/billing/messages.ts`.
+- `npm test` (Node 22.18+) runs the unit tests in `tests/`; `npm run typecheck`; `npm run lint`.
 
 ## Key Implementation Details
 
