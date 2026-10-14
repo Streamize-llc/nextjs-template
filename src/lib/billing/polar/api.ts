@@ -53,6 +53,15 @@ export function isCustomerEmailRejection(error: unknown): boolean {
 }
 
 /**
+ * Is this "Polar has no such customer"? For an external id Polar does not know, the customer-session endpoint answers 422 with the validation
+ * message "Customer does not exist." (found against the real sandbox; 404 is accepted too). It means "this user has not paid at Polar yet", not an outage.
+ */
+export function isNoSuchCustomer(error: unknown): boolean {
+  if (!(error instanceof PolarApiError)) return false;
+  return error.status === 404 || (error.status === 422 && /customer does not exist/i.test(error.detail));
+}
+
+/**
  * A checkout THIS server creates for one product. The customer is the signed-in user: `external_customer_id` is the userId, set here and never by
  * the browser, and it is what every later payload is credited through. Returns the URL to send the buyer to.
  */
@@ -79,7 +88,7 @@ export async function createPortalSession(userId: string, returnUrl: string, fet
     if (!session.customer_portal_url) throw new Error("Polar did not return a portal link");
     return session.customer_portal_url;
   } catch (error) {
-    if (error instanceof PolarApiError && error.status === 404) return null;
+    if (isNoSuchCustomer(error)) return null;
     throw error;
   }
 }

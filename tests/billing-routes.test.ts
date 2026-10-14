@@ -580,7 +580,7 @@ describe("POST /api/billing/portal", () => {
     user = verified(USER_ID, "buyer@example.com");
     linkPolar(USER_ID);
     process.env.BILLING_PROVIDER = "polar";
-    polarAnswers = { "POST /v1/customer-sessions": () => jsonResponse(404, { error: "ResourceNotFound", detail: "Customer not found." }) };
+    polarAnswers = { "POST /v1/customer-sessions": () => jsonResponse(422, { detail: [{ type: "value_error", loc: ["body", "external_customer_id"], msg: "Customer does not exist.", input: "x" }] }) };
     const response = await portal.POST(post("/api/billing/portal"));
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { error: "no_customer" });
