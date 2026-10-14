@@ -22,7 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Billing (Paddle)
 
-Subscriptions and one-time purchases are built in: `/pricing`, `/billing`, a signed webhook, Supabase tables with Row Level Security, and an `getEntitlement()` helper for the rest of your app. It stays off until you configure it.
+Subscriptions and one-time purchases are built in: `/pricing`, `/billing`, a signed webhook, Supabase tables with Row Level Security, and a `getEntitlement()` helper for the rest of your app. It stays off until you configure it.
 
 ```bash
 # 1. edit your plans in src/config/billing.ts, apply the migration (npm run db:reset), fill .env.local from .env.example
